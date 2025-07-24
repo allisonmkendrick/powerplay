@@ -1,35 +1,46 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Button, Container, Title, Text } from '@mantine/core';
+
+const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
+const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+const AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
+const RESPONSE_TYPE = 'token';
+const SCOPES = [
+  'user-read-playback-state',
+  'user-modify-playback-state',
+  'user-read-currently-playing',
+  'streaming',
+  'user-read-email',
+  'user-read-private',
+].join(' ');
 
 function App() {
-  const [count, setCount] = useState(0)
+  const handleLogin = () => {
+    const authUrl = `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
+      REDIRECT_URI
+    )}&response_type=${RESPONSE_TYPE}&scope=${encodeURIComponent(SCOPES)}`;
+    window.location.href = authUrl;
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Container size="sm" py="xl">
+      <Title ta="center" mb="md">
+        🍻 PowerPlay!
+      </Title>
+      <Text ta="center" color="dimmed" mb="lg">
+        The ultimate 60-minute music drinking game.<br />
+        Login with Spotify to begin.
+      </Text>
+      <Button
+        fullWidth
+        size="lg"
+        radius="md"
+        onClick={handleLogin}
+        style={{ marginTop: 32 }}
+      >
+        Login with Spotify
+      </Button>
+    </Container>
+  );
 }
 
-export default App
+export default App;
