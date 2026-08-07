@@ -16,11 +16,23 @@ export type PlayerStatus =
   | 'needs-premium'
   | 'error';
 
+/** What the SDK itself believes, which is not always what we asked for. */
+export type SdkState = {
+  paused: boolean;
+  positionMs: number;
+  trackName: string | null;
+  volume: number | null;
+  /** False when the browser build has no way to unlock audio. */
+  canActivate: boolean;
+  activated: boolean;
+};
+
 type PlayerHandle = {
   status: PlayerStatus;
   deviceId: string | null;
   error: string | null;
   player: Spotify.Player | null;
+  sdk: SdkState;
   /**
    * Must be called from inside a click. Browsers refuse to let a page make
    * noise unless the audio element is unlocked by a real user gesture, and
@@ -68,6 +80,15 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
   const [error, setError] = useState<string | null>(null);
   const playerRef = useRef<Spotify.Player | null>(null);
 
+  const [sdk, setSdk] = useState<SdkState>({
+    paused: true,
+    positionMs: 0,
+    trackName: null,
+    volume: null,
+    canActivate: false,
+    activated: false,
+  });
+
   // The SDK asks for a token whenever it needs one, which can be long after
   // setup, so it reads from a ref rather than closing over a stale value.
   const tokenRef = useRef(token);
@@ -103,6 +124,25 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
         if (cancelled) return;
         setDeviceId(device_id);
         setStatus('ready');
+        setSdk((s) => ({
+          ...s,
+          canActivate: typeof player?.activateElement === 'function',
+        }));
+        void player?.getVolume().then((v) => {
+          if (!cancelled) setSdk((s) => ({ ...s, volume: v }));
+        });
+      });
+
+      // The SDK's own view of playback. If this says paused while our
+      // countdown runs, the problem is the browser rather than the engine.
+      player.addListener('player_state_changed', (state) => {
+        if (cancelled || !state) return;
+        setSdk((s) => ({
+          ...s,
+          paused: state.paused,
+          positionMs: state.position,
+          trackName: state.track_window?.current_track?.name ?? null,
+        }));
       });
 
       player.addListener('not_ready', () => {
@@ -145,10 +185,15 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
   }, [token]);
 
   const activate = useCallback(async () => {
-    // Older SDK builds do not expose this, and it is only needed where the
-    // browser is strict, so a missing method is not an error.
-    await playerRef.current?.activateElement?.();
+    const player = playerRef.current;
+    if (typeof player?.activateElement !== 'function') return;
+    try {
+      await player.activateElement();
+      setSdk((s) => ({ ...s, activated: true }));
+    } catch {
+      setSdk((s) => ({ ...s, activated: false }));
+    }
   }, []);
 
-  return { status, deviceId, error, player: playerRef.current, activate };
+  return { status, deviceId, error, player: playerRef.current, sdk, activate };
 }

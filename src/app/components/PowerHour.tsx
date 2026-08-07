@@ -24,6 +24,7 @@ export default function PowerHour({ token }: PowerHourProps) {
     deviceId,
     error: playerError,
     activate,
+    sdk,
   } = useSpotifyPlayer(token);
   const hour = useHourEngine(token, deviceId, round?.tracks ?? []);
 
@@ -79,6 +80,7 @@ export default function PowerHour({ token }: PowerHourProps) {
     return (
       <HourPlayer
         hour={hour}
+        sdk={sdk}
         onExit={() => {
           hour.stop();
           setRound(null);
