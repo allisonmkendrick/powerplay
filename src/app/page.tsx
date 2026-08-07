@@ -48,6 +48,13 @@ function HomeContent() {
         .then((data) => {
           if (data.access_token) {
             setToken(data.access_token);
+            // Lets the diagnostic page at /test reuse the session without
+            // needing its own redirect URI on the Spotify allowlist.
+            try {
+              sessionStorage.setItem('pp_token', data.access_token);
+            } catch {
+              // Private windows can refuse storage. Not worth failing over.
+            }
             // Optionally store in localStorage: localStorage.setItem('spotify_token', data.access_token)
             // Remove code from the URL (for a clean look)
             router.replace('/');
