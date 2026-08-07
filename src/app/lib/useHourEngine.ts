@@ -8,6 +8,11 @@ import { MINUTE_MS, startOffsetMs } from './startOffset';
  * The power hour itself: play a minute of a track, move to the next, sixty
  * times over.
  *
+ * The whole round is handed to Spotify as one queue rather than a track at
+ * a time. Playing single tracks left Spotify with nothing lined up behind
+ * each one, so it filled the gap from its own recommendations and a stranger
+ * turned up between minutes.
+ *
  * Timing is held as a deadline rather than a countdown. Adding up sixty
  * intervals would drift by the end of the hour, and a power hour that runs
  * long is a power hour nobody finishes.
@@ -34,10 +39,17 @@ export type Hour = {
 
 const TICK_MS = 200;
 
-async function playTrack(
+/** How long to let Spotify settle on a track before giving up on it. */
+const TRACK_CHANGE_TIMEOUT_MS = 4_000;
+
+/**
+ * Hands Spotify the entire round in one call, so its queue is exactly our
+ * round and there is no gap for it to fill.
+ */
+async function queueRound(
   token: string,
   deviceId: string,
-  track: Track,
+  tracks: Track[],
 ): Promise<void> {
   const res = await fetch(
     `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`,
@@ -47,17 +59,15 @@ async function playTrack(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      // Deliberately no position_ms. Asking Spotify to begin mid-track is
-      // an extra thing that can fail at the moment playback starts, and
-      // starting at zero is the path proven to work. The offset is applied
-      // by seeking once sound is actually coming out.
-      body: JSON.stringify({ uris: [track.uri] }),
+      // No position_ms. Starting mid-track is an extra thing that can fail
+      // as playback begins; the offset is applied by seeking afterwards.
+      body: JSON.stringify({ uris: tracks.map((t) => t.uri) }),
     },
   );
 
   // 202 means the device is still waking up, which resolves on its own.
   if (!res.ok && res.status !== 202) {
-    throw new Error(`Spotify refused to play that track (${res.status}).`);
+    throw new Error(`Spotify refused to start the round (${res.status}).`);
   }
 }
 
@@ -78,10 +88,8 @@ async function ensurePlaying(player: Spotify.Player | null): Promise<boolean> {
     await new Promise((r) => setTimeout(r, 250));
     const state = await player.getCurrentState();
 
-    // No state means this device is not the active one.
     if (!state) continue;
 
-    // Sound is only really happening once the clock moves.
     if (!state.paused && state.position > 0 && state.position !== previous) {
       return true;
     }
@@ -93,13 +101,24 @@ async function ensurePlaying(player: Spotify.Player | null): Promise<boolean> {
   return false;
 }
 
-async function pausePlayback(token: string, deviceId: string): Promise<void> {
-  await fetch(`https://api.spotify.com/v1/me/player/pause?device_id=${deviceId}`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-  }).catch(() => {
-    // Pausing something already paused is not worth surfacing.
-  });
+/**
+ * Spotify changes track a moment after being asked. Seeking before it lands
+ * would seek the outgoing song, so wait for the one we expect.
+ */
+async function waitForTrack(
+  player: Spotify.Player | null,
+  uri: string,
+): Promise<boolean> {
+  if (!player) return false;
+  const deadline = Date.now() + TRACK_CHANGE_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    const state = await player.getCurrentState();
+    if (state?.track_window?.current_track?.uri === uri) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  return false;
 }
 
 export function useHourEngine(
@@ -131,49 +150,66 @@ export function useHourEngine(
     }
   }, []);
 
-  /** Starts the minute for a given position and arms its deadline. */
-  const playAt = useCallback(
+  const finish = useCallback(() => {
+    clearTick();
+    deadlineRef.current = null;
+    setStatus('finished');
+    void playerRef.current?.pause().catch(() => {});
+  }, [clearTick]);
+
+  /** Skips the intro, but only once the right track is actually playing. */
+  const applyOffset = useCallback(async (track: Track) => {
+    const offset = startOffsetMs(track);
+    if (offset > 0) {
+      await playerRef.current?.seek(offset).catch(() => {});
+    }
+  }, []);
+
+  /** Arms the minute for whatever is playing now. */
+  const beginMinute = useCallback((position: number) => {
+    indexRef.current = position;
+    setIndex(position);
+    setRemainingMs(MINUTE_MS);
+    deadlineRef.current = Date.now() + MINUTE_MS;
+    setStatus('playing');
+  }, []);
+
+  /**
+   * Moves to the next track in Spotify's queue, which is our round. Falls
+   * back to naming the track directly if the queue has drifted.
+   */
+  const advanceTo = useCallback(
     async (position: number) => {
       if (!token || !deviceId) return;
 
       if (position >= tracks.length) {
-        clearTick();
-        deadlineRef.current = null;
-        setStatus('finished');
+        finish();
         return;
       }
 
-      indexRef.current = position;
-      setIndex(position);
-      setRemainingMs(MINUTE_MS);
+      const track = tracks[position];
+      const player = playerRef.current;
 
-      try {
-        const track = tracks[position];
-        await playTrack(token, deviceId, track);
+      await player?.nextTrack().catch(() => {});
+      let landed = await waitForTrack(player, track.uri);
 
-        // The minute starts when sound does, not when the request returns.
-        const playing = await ensurePlaying(playerRef.current);
-        if (!playing) {
-          setError('Spotify would not start that track.');
-          setStatus('paused');
-          return;
-        }
-
-        // Skip the intro only once audio is confirmed running, so a seek
-        // can never be the thing that stops it starting.
-        const offset = startOffsetMs(track);
-        if (offset > 0) {
-          await playerRef.current?.seek(offset).catch(() => {});
-        }
-
-        deadlineRef.current = Date.now() + MINUTE_MS;
-        setStatus('playing');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Playback failed.');
-        setStatus('paused');
+      if (!landed) {
+        // The queue drifted, so put Spotify back on the right track by
+        // name. This restarts the context, which is why it is the fallback.
+        await queueRound(token, deviceId, tracks.slice(position)).catch(() => {});
+        landed = await waitForTrack(player, track.uri);
       }
+
+      if (!landed) {
+        setError('Lost track of the queue. Try starting the hour again.');
+        setStatus('paused');
+        return;
+      }
+
+      await applyOffset(track);
+      beginMinute(position);
     },
-    [token, deviceId, tracks, clearTick],
+    [token, deviceId, tracks, finish, applyOffset, beginMinute],
   );
 
   // One ticker for the whole hour. It only reads the deadline, so pausing
@@ -190,50 +226,68 @@ export function useHourEngine(
 
       const left = deadline - Date.now();
       if (left <= 0) {
-        void playAt(indexRef.current + 1);
+        // Stop the clock while the next track is being cued, or the tick
+        // fires again before the change lands.
+        deadlineRef.current = null;
+        void advanceTo(indexRef.current + 1);
       } else {
         setRemainingMs(left);
       }
     }, TICK_MS);
 
     return clearTick;
-  }, [status, playAt, clearTick]);
+  }, [status, advanceTo, clearTick]);
 
   useEffect(() => clearTick, [clearTick]);
 
   const start = useCallback(() => {
     setError(null);
-    void playAt(0);
-  }, [playAt]);
+    if (!token || !deviceId || !tracks.length) return;
+
+    void (async () => {
+      try {
+        await queueRound(token, deviceId, tracks);
+
+        if (!(await ensurePlaying(playerRef.current))) {
+          setError('Spotify would not start the music.');
+          setStatus('paused');
+          return;
+        }
+
+        await applyOffset(tracks[0]);
+        beginMinute(0);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Playback failed.');
+        setStatus('paused');
+      }
+    })();
+  }, [token, deviceId, tracks, applyOffset, beginMinute]);
 
   const pause = useCallback(() => {
-    if (!token || !deviceId) return;
     clearTick();
     // Bank what is left so resuming gives back the same minute, not a new one.
     const deadline = deadlineRef.current;
     setRemainingMs(deadline ? Math.max(0, deadline - Date.now()) : MINUTE_MS);
     deadlineRef.current = null;
     setStatus('paused');
-    void pausePlayback(token, deviceId);
-  }, [token, deviceId, clearTick]);
+    void playerRef.current?.pause().catch(() => {});
+  }, [clearTick]);
 
   const resume = useCallback(() => {
-    if (!token || !deviceId) return;
-    // Resuming re-issues the track, so the offset is honoured rather than
-    // picking up wherever Spotify happened to stop.
+    // The queue holds its position, so this picks up where it stopped
+    // rather than restarting the track.
     deadlineRef.current = Date.now() + remainingMs;
     setStatus('playing');
-    void playTrack(token, deviceId, tracks[indexRef.current])
-      .then(() => ensurePlaying(playerRef.current))
-      .catch(() => {
-        setError('Could not resume. Try again.');
-        setStatus('paused');
-      });
-  }, [token, deviceId, tracks, remainingMs]);
+    void playerRef.current?.resume().catch(() => {
+      setError('Could not resume. Try again.');
+      setStatus('paused');
+    });
+  }, [remainingMs]);
 
   const skip = useCallback(() => {
-    void playAt(indexRef.current + 1);
-  }, [playAt]);
+    deadlineRef.current = null;
+    void advanceTo(indexRef.current + 1);
+  }, [advanceTo]);
 
   const stop = useCallback(() => {
     clearTick();
@@ -242,8 +296,8 @@ export function useHourEngine(
     setIndex(0);
     setRemainingMs(MINUTE_MS);
     setStatus('idle');
-    if (token && deviceId) void pausePlayback(token, deviceId);
-  }, [token, deviceId, clearTick]);
+    void playerRef.current?.pause().catch(() => {});
+  }, [clearTick]);
 
   return {
     status,
