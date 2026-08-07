@@ -2,8 +2,6 @@
 
 import { Button, Container, Group, Progress, Stack, Text, Title } from '@mantine/core';
 import type { Hour } from '../lib/useHourEngine';
-import type { SdkState } from '../lib/useSpotifyPlayer';
-import type { Device } from '../lib/useDevices';
 import { MINUTE_MS } from '../lib/startOffset';
 
 /**
@@ -14,23 +12,13 @@ import { MINUTE_MS } from '../lib/startOffset';
 type HourPlayerProps = {
   hour: Hour;
   onExit: () => void;
-  /** Temporary, while we work out why audio is silent. */
-  sdk: SdkState;
-  devices: Device[];
-  deviceId: string | null;
 };
 
 function seconds(ms: number): string {
   return String(Math.max(0, Math.ceil(ms / 1000)));
 }
 
-export default function HourPlayer({
-  hour,
-  onExit,
-  sdk,
-  devices,
-  deviceId,
-}: HourPlayerProps) {
+export default function HourPlayer({ hour, onExit }: HourPlayerProps) {
   const { status, index, current, next, remainingMs, total, error } = hour;
 
   if (status === 'finished') {
@@ -134,35 +122,6 @@ export default function HourPlayer({
             End
           </Button>
         </Group>
-
-        {/* Temporary. Remove once audio is confirmed working. */}
-        <Stack gap={2} mt="xl">
-          <Text size="xs" c="dimmed" ta="center" fw={600}>
-            Spotify SDK state
-          </Text>
-          <Text size="xs" c="dimmed" ta="center" ff="monospace">
-            paused={String(sdk.paused)} position={Math.round(sdk.positionMs / 1000)}s
-            volume={sdk.volume === null ? '?' : sdk.volume.toFixed(2)}
-          </Text>
-          <Text size="xs" c="dimmed" ta="center" ff="monospace">
-            sdkTrack={sdk.trackName ?? 'none'}
-          </Text>
-          <Text size="xs" c="dimmed" ta="center" ff="monospace">
-            canActivate={String(sdk.canActivate)} activated={String(sdk.activated)}
-          </Text>
-          <Text size="xs" c={sdk.lastError ? 'red' : 'dimmed'} ta="center" ff="monospace">
-            stalls={sdk.stalls} lastError={sdk.lastError ?? 'none'}
-          </Text>
-          <Text size="xs" c="dimmed" ta="center" fw={600} mt="xs">
-            Spotify devices ({devices.length})
-          </Text>
-          {devices.map((d) => (
-            <Text key={d.id} size="xs" c="dimmed" ta="center" ff="monospace">
-              {d.name} [{d.type}] active={String(d.is_active)}
-              {d.id === deviceId ? ' <- ours' : ''}
-            </Text>
-          ))}
-        </Stack>
       </Stack>
     </Container>
   );

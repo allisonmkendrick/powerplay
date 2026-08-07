@@ -6,7 +6,6 @@ import PlaylistList from './PlaylistList';
 import HourPlayer from './HourPlayer';
 import { useSpotifyPlayer } from '../lib/useSpotifyPlayer';
 import { useHourEngine } from '../lib/useHourEngine';
-import { useDevices } from '../lib/useDevices';
 import type { Round } from '../lib/round';
 
 /**
@@ -24,12 +23,9 @@ export default function PowerHour({ token }: PowerHourProps) {
     status: playerStatus,
     deviceId,
     error: playerError,
-    activate,
-    sdk,
     player,
   } = useSpotifyPlayer(token);
   const hour = useHourEngine(token, deviceId, round?.tracks ?? [], player);
-  const devices = useDevices(token);
 
   // Chrome only lets audio begin inside a click, so the first track cannot
   // start automatically. It is queued as soon as a playlist is chosen, and
@@ -83,9 +79,6 @@ export default function PowerHour({ token }: PowerHourProps) {
     return (
       <HourPlayer
         hour={hour}
-        sdk={sdk}
-        devices={devices}
-        deviceId={deviceId}
         onExit={() => {
           hour.stop();
           preloaded.current = false;
@@ -99,10 +92,7 @@ export default function PowerHour({ token }: PowerHourProps) {
     <PlaylistList
       token={token}
       canStart={playerStatus === 'ready'}
-      onStart={(built) => {
-        void activate();
-        setRound(built);
-      }}
+      onStart={setRound}
     />
   );
 }
