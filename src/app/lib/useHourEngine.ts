@@ -60,6 +60,24 @@ async function playTrack(
   }
 }
 
+/**
+ * Points Spotify at this browser tab. Without it, audio can keep going to
+ * whatever device was last active, so the hour runs silently here while
+ * playing on a desktop app in another room.
+ */
+async function transferPlayback(token: string, deviceId: string): Promise<void> {
+  await fetch('https://api.spotify.com/v1/me/player', {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ device_ids: [deviceId], play: false }),
+  }).catch(() => {
+    // The play call names the device too, so this is belt and braces.
+  });
+}
+
 async function pausePlayback(token: string, deviceId: string): Promise<void> {
   await fetch(`https://api.spotify.com/v1/me/player/pause?device_id=${deviceId}`, {
     method: 'PUT',
@@ -147,8 +165,11 @@ export function useHourEngine(
 
   const start = useCallback(() => {
     setError(null);
-    void playAt(0);
-  }, [playAt]);
+    if (!token || !deviceId) return;
+    // Claim the device before the first track, or Spotify may keep sending
+    // audio to whatever was playing last.
+    void transferPlayback(token, deviceId).then(() => playAt(0));
+  }, [token, deviceId, playAt]);
 
   const pause = useCallback(() => {
     if (!token || !deviceId) return;

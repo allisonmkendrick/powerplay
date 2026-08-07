@@ -19,7 +19,12 @@ type PowerHourProps = {
 
 export default function PowerHour({ token }: PowerHourProps) {
   const [round, setRound] = useState<Round | null>(null);
-  const { status: playerStatus, deviceId, error: playerError } = useSpotifyPlayer(token);
+  const {
+    status: playerStatus,
+    deviceId,
+    error: playerError,
+    activate,
+  } = useSpotifyPlayer(token);
   const hour = useHourEngine(token, deviceId, round?.tracks ?? []);
 
   // The engine only sees the round on the render after it is set, so
@@ -87,6 +92,10 @@ export default function PowerHour({ token }: PowerHourProps) {
       token={token}
       canStart={playerStatus === 'ready'}
       onStart={(built) => {
+        // Unlock audio here, inside the click. Doing it after the state
+        // update would no longer count as a user gesture and the browser
+        // would refuse to make any sound.
+        void activate();
         startPending.current = true;
         setRound(built);
       }}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * The Spotify Web Playback SDK turns the browser tab into a speaker that
@@ -21,6 +21,12 @@ type PlayerHandle = {
   deviceId: string | null;
   error: string | null;
   player: Spotify.Player | null;
+  /**
+   * Must be called from inside a click. Browsers refuse to let a page make
+   * noise unless the audio element is unlocked by a real user gesture, and
+   * anything that happens after an await no longer counts as one.
+   */
+  activate: () => Promise<void>;
 };
 
 const SDK_SRC = 'https://sdk.scdn.co/spotify-player.js';
@@ -138,5 +144,11 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
     };
   }, [token]);
 
-  return { status, deviceId, error, player: playerRef.current };
+  const activate = useCallback(async () => {
+    // Older SDK builds do not expose this, and it is only needed where the
+    // browser is strict, so a missing method is not an error.
+    await playerRef.current?.activateElement?.();
+  }, []);
+
+  return { status, deviceId, error, player: playerRef.current, activate };
 }
