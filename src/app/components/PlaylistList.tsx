@@ -5,7 +5,12 @@ import Window from './Window';
 import { Sparkle } from './Sparkles';
 import PlaylistCard from './PlaylistCard';
 import RoundPreview from './RoundPreview';
-import { fetchPlaylistTracks, SpotifyError } from '../lib/spotify';
+import {
+  fetchPlaylistTracks,
+  fetchPlaylists,
+  SpotifyError,
+  type Playlist,
+} from '../lib/spotify';
 import { buildRound, type Round } from '../lib/round';
 
 type PlaylistListProps = {
@@ -14,15 +19,7 @@ type PlaylistListProps = {
   onStart: (round: Round) => void;
 };
 
-export type Playlist = {
-  id: string;
-  name: string;
-  images?: { url: string }[];
-  tracks: { total: number };
-  collaborative: boolean;
-  public: boolean;
-  owner: { display_name: string };
-};
+export type { Playlist };
 
 export default function PlaylistList({ token, canStart, onStart }: PlaylistListProps) {
   const [playlists, setPlaylists] = useState<Playlist[] | null>(null);
@@ -39,16 +36,23 @@ export default function PlaylistList({ token, canStart, onStart }: PlaylistListP
   const inFlight = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (token) {
-      setLoading(true);
-      fetch('https://api.spotify.com/v1/me/playlists?limit=20', {
-        headers: { Authorization: `Bearer ${token}` },
+    if (!token) return;
+    const controller = new AbortController();
+
+    setLoading(true);
+    fetchPlaylists(token, controller.signal)
+      .then(setPlaylists)
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(
+          err instanceof SpotifyError ? err.message : 'Failed to fetch playlists.',
+        );
       })
-        .then((res) => res.json())
-        .then((data) => setPlaylists(data.items || []))
-        .catch(() => setError('Failed to fetch playlists.'))
-        .finally(() => setLoading(false));
-    }
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [token]);
 
   useEffect(() => {
