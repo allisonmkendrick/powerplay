@@ -47,10 +47,11 @@ async function playTrack(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        uris: [track.uri],
-        position_ms: startOffsetMs(track),
-      }),
+      // Deliberately no position_ms. Asking Spotify to begin mid-track is
+      // an extra thing that can fail at the moment playback starts, and
+      // starting at zero is the path proven to work. The offset is applied
+      // by seeking once sound is actually coming out.
+      body: JSON.stringify({ uris: [track.uri] }),
     },
   );
 
@@ -61,25 +62,37 @@ async function playTrack(
 }
 
 /**
- * The REST call loads the track but does not always start it. Transferring
- * a device and then playing races often enough that the track lands queued
- * at position zero and simply waits. Ask the SDK what actually happened and
- * nudge it if it is sitting still.
+ * The REST endpoint reliably loads a track and unreliably starts it. It
+ * reports `paused: false` for a moment, emits a playback error, and settles
+ * back to paused at position zero. Calling resume afterwards starts the
+ * track that is already loaded, which does work.
+ *
+ * The test that matters is whether the position moves. `paused === false`
+ * appears during the failed attempt too, so trusting it returns success
+ * while the track sits silent.
  */
-async function ensurePlaying(player: Spotify.Player | null): Promise<void> {
-  if (!player) return;
+async function ensurePlaying(player: Spotify.Player | null): Promise<boolean> {
+  if (!player) return false;
 
-  for (let attempt = 0; attempt < 5; attempt++) {
-    await new Promise((r) => setTimeout(r, 150));
+  let previous = -1;
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await new Promise((r) => setTimeout(r, 250));
     const state = await player.getCurrentState();
 
-    // No state means this device is not the active one, which resume
-    // cannot fix, so leave it for the caller to report.
+    // No state means this device is not the active one.
     if (!state) continue;
-    if (!state.paused) return;
 
+    // Sound is only really happening once the clock moves.
+    if (!state.paused && state.position > 0 && state.position !== previous) {
+      return true;
+    }
+
+    previous = state.position;
     await player.resume().catch(() => {});
   }
+
+  return false;
 }
 
 async function pausePlayback(token: string, deviceId: string): Promise<void> {
@@ -137,9 +150,24 @@ export function useHourEngine(
       setRemainingMs(MINUTE_MS);
 
       try {
-        await playTrack(token, deviceId, tracks[position]);
+        const track = tracks[position];
+        await playTrack(token, deviceId, track);
+
         // The minute starts when sound does, not when the request returns.
-        await ensurePlaying(playerRef.current);
+        const playing = await ensurePlaying(playerRef.current);
+        if (!playing) {
+          setError('Spotify would not start that track.');
+          setStatus('paused');
+          return;
+        }
+
+        // Skip the intro only once audio is confirmed running, so a seek
+        // can never be the thing that stops it starting.
+        const offset = startOffsetMs(track);
+        if (offset > 0) {
+          await playerRef.current?.seek(offset).catch(() => {});
+        }
+
         deadlineRef.current = Date.now() + MINUTE_MS;
         setStatus('playing');
       } catch (err) {
