@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Container, Title, Text, Button, Stack, Center, Loader } from '@mantine/core';
-import PlaylistList from './components/PlaylistList';
+import PowerHour from './components/PowerHour';
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI;
@@ -60,16 +60,6 @@ function HomeContent() {
     }
   }, [code, token, loading, router]);
 
-  useEffect(() => {
-    // Only load the SDK if not already loaded and user is logged in
-    if (typeof window !== 'undefined' && !window.Spotify && token) {
-      const script = document.createElement('script');
-      script.src = 'https://sdk.scdn.co/spotify-player.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, [token]);
-
   if (loading) {
     return (
       <Center style={{ minHeight: '100vh' }}>
@@ -80,7 +70,7 @@ function HomeContent() {
   }
 
   if (token) {
-    return <PlaylistList token={token} />;
+    return <PowerHour token={token} />;
   }
 
   return (

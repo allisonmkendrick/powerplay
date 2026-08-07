@@ -80,6 +80,25 @@ function toTrack(item: RawItem): Track {
 }
 
 /**
+ * The listener's country, which decides what is licensed to them. Spotify
+ * omits `is_playable` entirely unless a market is supplied, so without this
+ * the playable check silently passes everything.
+ */
+async function fetchMarket(token: string, signal?: AbortSignal): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    });
+    if (!res.ok) return null;
+    const me = await res.json();
+    return me.country ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Every playable track in a playlist, following Spotify's paging until it
  * runs out. Pass a signal so switching playlists mid-fetch can cancel.
  */
@@ -89,10 +108,12 @@ export async function fetchPlaylistTracks(
   signal?: AbortSignal,
 ): Promise<Track[]> {
   const tracks: Track[] = [];
+  const market = await fetchMarket(token, signal);
 
   let url: string | null =
     `https://api.spotify.com/v1/playlists/${playlistId}/tracks` +
-    `?limit=${PAGE_SIZE}&offset=0&fields=${encodeURIComponent(FIELDS)}`;
+    `?limit=${PAGE_SIZE}&offset=0&fields=${encodeURIComponent(FIELDS)}` +
+    (market ? `&market=${market}` : '');
 
   while (url) {
     const res: Response = await fetch(url, {
