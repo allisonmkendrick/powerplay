@@ -6,6 +6,7 @@ import PlaylistList from './PlaylistList';
 import HourPlayer from './HourPlayer';
 import { useSpotifyPlayer } from '../lib/useSpotifyPlayer';
 import { useHourEngine } from '../lib/useHourEngine';
+import { useDevices } from '../lib/useDevices';
 import type { Round } from '../lib/round';
 
 /**
@@ -28,6 +29,7 @@ export default function PowerHour({ token }: PowerHourProps) {
     player,
   } = useSpotifyPlayer(token);
   const hour = useHourEngine(token, deviceId, round?.tracks ?? [], player);
+  const devices = useDevices(token);
 
   // The engine only sees the round on the render after it is set, so
   // starting is deferred until then. Calling start in the click handler
@@ -82,6 +84,8 @@ export default function PowerHour({ token }: PowerHourProps) {
       <HourPlayer
         hour={hour}
         sdk={sdk}
+        devices={devices}
+        deviceId={deviceId}
         onExit={() => {
           hour.stop();
           setRound(null);

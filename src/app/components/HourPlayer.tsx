@@ -3,6 +3,7 @@
 import { Button, Container, Group, Progress, Stack, Text, Title } from '@mantine/core';
 import type { Hour } from '../lib/useHourEngine';
 import type { SdkState } from '../lib/useSpotifyPlayer';
+import type { Device } from '../lib/useDevices';
 import { MINUTE_MS } from '../lib/startOffset';
 
 /**
@@ -15,13 +16,21 @@ type HourPlayerProps = {
   onExit: () => void;
   /** Temporary, while we work out why audio is silent. */
   sdk: SdkState;
+  devices: Device[];
+  deviceId: string | null;
 };
 
 function seconds(ms: number): string {
   return String(Math.max(0, Math.ceil(ms / 1000)));
 }
 
-export default function HourPlayer({ hour, onExit, sdk }: HourPlayerProps) {
+export default function HourPlayer({
+  hour,
+  onExit,
+  sdk,
+  devices,
+  deviceId,
+}: HourPlayerProps) {
   const { status, index, current, next, remainingMs, total, error } = hour;
 
   if (status === 'finished') {
@@ -116,6 +125,15 @@ export default function HourPlayer({ hour, onExit, sdk }: HourPlayerProps) {
           <Text size="xs" c={sdk.lastError ? 'red' : 'dimmed'} ta="center" ff="monospace">
             stalls={sdk.stalls} lastError={sdk.lastError ?? 'none'}
           </Text>
+          <Text size="xs" c="dimmed" ta="center" fw={600} mt="xs">
+            Spotify devices ({devices.length})
+          </Text>
+          {devices.map((d) => (
+            <Text key={d.id} size="xs" c="dimmed" ta="center" ff="monospace">
+              {d.name} [{d.type}] active={String(d.is_active)}
+              {d.id === deviceId ? ' <- ours' : ''}
+            </Text>
+          ))}
         </Stack>
       </Stack>
     </Container>
