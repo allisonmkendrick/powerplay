@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Container, Title, Text, Button, Stack, Center, Loader } from '@mantine/core';
+import Window from './components/Window';
+import { Sparkle } from './components/Sparkles';
 import PowerHour from './components/PowerHour';
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
@@ -62,10 +63,11 @@ function HomeContent() {
 
   if (loading) {
     return (
-      <Center style={{ minHeight: '100vh' }}>
-        <Loader size="xl" />
-        <Text ta="center">Logging in with Spotify...</Text>
-      </Center>
+      <div className="center-screen">
+        <Window title="connecting.exe" dialog>
+          <p className="terminal center">Logging in with Spotify...</p>
+        </Window>
+      </div>
     );
   }
 
@@ -74,28 +76,30 @@ function HomeContent() {
   }
 
   return (
-    <Center style={{ minHeight: '100vh' }}>
-      <Container size="sm">
-        <Stack align="center" gap="md">
-          <Title ta="center" mb="md">
-            🍻 PowerPlay!
-          </Title>
-          <Text ta="center" color="dimmed" mb="lg">
-            The ultimate 60-minute music drinking game.
-            <br />
-            Login with Spotify to begin.
-          </Text>
-          <Button size="lg" radius="md" onClick={handleLogin} style={{ marginTop: 32 }}>
-            Login with Spotify
-          </Button>
-          {error && (
-            <Text color="red" ta="center">
-              {error}
-            </Text>
-          )}
-        </Stack>
-      </Container>
-    </Center>
+    <div className="center-screen relative">
+      <Sparkle size={28} style={{ top: '18%', left: '14%' }} />
+      <Sparkle size={18} style={{ top: '26%', right: '18%' }} />
+      <Sparkle size={22} style={{ bottom: '20%', left: '22%' }} />
+
+      <div style={{ maxWidth: 460, width: '100%' }}>
+        <Window title="powerplay.exe">
+          <div className="stack center">
+            <h1 className="pixel">POWERPLAY</h1>
+            <p className="terminal">
+              Sixty songs. One minute each.
+              <br />
+              Built from your own playlists.
+            </p>
+            <div className="btn-row" style={{ justifyContent: 'center' }}>
+              <button className="btn btn--primary btn--big" onClick={handleLogin}>
+                LOG IN WITH SPOTIFY
+              </button>
+            </div>
+            {error && <p className="terminal danger">{error}</p>}
+          </div>
+        </Window>
+      </div>
+    </div>
   );
 }
 
@@ -105,9 +109,11 @@ export default function HomePage() {
   return (
     <Suspense
       fallback={
-        <Center style={{ minHeight: '100vh' }}>
-          <Loader size="xl" />
-        </Center>
+        <div className="center-screen">
+          <Window title="loading.exe" dialog>
+            <p className="terminal center">Starting up...</p>
+          </Window>
+        </div>
       }
     >
       <HomeContent />

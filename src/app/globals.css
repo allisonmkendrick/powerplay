@@ -1,26 +1,421 @@
-@import "tailwindcss";
+/* ===============================================================
+   Retro Y2K, Bubblegum palette.
+
+   Rules that hold everywhere: 2px solid borders on everything,
+   zero radius, hard-offset shadows with no blur. No soft
+   elevation, no glass, no gradients on buttons.
+
+   Switching palette means changing the tokens below and nothing
+   else. All four in the design system share this structure.
+   =============================================================== */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #ff85c2;
+  --bg-grid: #ff6faf;
+  --window-body: #fff5dc;
+  --title-bar: #ffd84d;
+  --border: #1a0a2e;
+  --text: #1a0a2e;
+  --text-muted: #6b4c6b;
+  --btn-primary: #ffd84d;
+  --btn-danger: #ff3d6b;
+  --accent: #c8a0ff;
+  --sparkle: #ff3d9a;
+
+  --shadow-window: 4px 4px 0 var(--border);
+  --shadow-button: 3px 3px 0 var(--border);
+  --shadow-dialog: 6px 6px 0 var(--border);
+  --shadow-input: 2px 2px 0 var(--border);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100dvh;
+  color: var(--text);
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  background-color: var(--bg);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  body {
+    animation: flicker 400ms steps(1) 1;
+  }
+}
+
+@keyframes flicker {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ── Type ───────────────────────────────────────────────────── */
+
+.pixel {
+  font-family: var(--font-press-start), monospace;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.terminal {
+  font-family: var(--font-vt323), monospace;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+h1.pixel {
+  font-size: clamp(15px, 3.4vw, 22px);
+}
+
+h2.pixel {
+  font-size: clamp(11px, 2.2vw, 14px);
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* ── Layout ─────────────────────────────────────────────────── */
+
+.desktop {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 24px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.center-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+/* ── Window chrome ──────────────────────────────────────────── */
+
+.window {
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow-window);
+  background: var(--window-body);
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .window {
+    animation: spawn 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .window:nth-of-type(2) { animation-delay: 80ms; }
+  .window:nth-of-type(3) { animation-delay: 160ms; }
+  .window:nth-of-type(4) { animation-delay: 240ms; }
+}
+
+@keyframes spawn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.window__bar {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  padding: 0 8px;
+  background: var(--title-bar);
+  border-bottom: 2px solid var(--border);
+}
+
+/* Faint scanlines across the chrome, as a 2001 monitor would have. */
+.window__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.06) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+.window__title {
+  font-family: var(--font-press-start), monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.window__controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.window__controls span {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.dot-close { background: #ff5b5b; }
+.dot-min { background: #ffd84d; }
+.dot-max { background: #59d98f; }
+
+.window__body {
+  padding: 16px;
+}
+
+.window--dialog {
+  max-width: 300px;
+  box-shadow: var(--shadow-dialog);
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+
+.btn {
+  font-family: var(--font-press-start), monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  padding: 10px 16px;
+  border: 2px solid var(--border);
+  border-radius: 0;
+  box-shadow: var(--shadow-button);
+  background: var(--window-body);
+  color: var(--text);
+  cursor: pointer;
+  transition: filter 80ms linear, transform 80ms linear, box-shadow 80ms linear;
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+/* Physically pressed: the button moves into its own shadow. */
+.btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--primary { background: var(--btn-primary); }
+.btn--danger { background: var(--btn-danger); }
+.btn--big { font-size: 12px; padding: 16px 28px; }
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ── Progress ───────────────────────────────────────────────── */
+
+.progress {
+  height: 18px;
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow-input);
+  background: #fff;
+  overflow: hidden;
+}
+
+.progress__fill {
+  height: 100%;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--sparkle) 0 8px,
+    var(--accent) 8px 16px
+  );
+  background-size: 22px 22px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .progress__fill {
+    animation: march 0.6s linear infinite;
+  }
+}
+
+@keyframes march {
+  from { background-position: 0 0; }
+  to { background-position: 22px 0; }
+}
+
+/* ── Lists ──────────────────────────────────────────────────── */
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 2px solid var(--border);
+  background: #fff;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  width: 100%;
+  transition: filter 80ms linear, transform 80ms linear;
+}
+
+.row:hover { filter: brightness(0.97); }
+.row[aria-pressed='true'] {
+  background: var(--accent);
+  box-shadow: var(--shadow-input);
+}
+
+.row__art {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  object-fit: cover;
+  /* Checkerboard shows through wherever a playlist has no art. */
+  background-image: linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.row__text { min-width: 0; flex: 1; }
+
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tracklist {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 2px dashed var(--border);
+  padding: 8px;
+}
+
+.tracklist div {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.tracklist span:first-child {
+  width: 26px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* ── The countdown ──────────────────────────────────────────── */
+
+.countdown {
+  font-family: var(--font-press-start), monospace;
+  font-size: clamp(56px, 18vw, 128px);
+  line-height: 1.2;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.now-playing {
+  font-size: clamp(18px, 4vw, 30px);
+  line-height: 1.25;
+  text-align: center;
+}
+
+/* ── Sparkles ───────────────────────────────────────────────── */
+
+.sparkle {
+  position: absolute;
+  color: var(--sparkle);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sparkle {
+    animation: twinkle 3s ease-in-out infinite;
+  }
+  .sparkle:nth-of-type(2) { animation-delay: 0.8s; }
+  .sparkle:nth-of-type(3) { animation-delay: 1.6s; }
+}
+
+@keyframes twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+  50% { transform: scale(1.35) rotate(45deg); opacity: 1; }
+}
+
+/* ── Misc ───────────────────────────────────────────────────── */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stack--tight { gap: 6px; }
+.center { text-align: center; }
+.muted { color: var(--text-muted); }
+.danger { color: var(--btn-danger); }
+.relative { position: relative; }
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--sparkle);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 12px; }
+::-webkit-scrollbar-track {
+  background: var(--window-body);
+  border-left: 2px solid var(--border);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--title-bar);
+  border: 2px solid var(--border);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
