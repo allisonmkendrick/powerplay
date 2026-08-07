@@ -27,15 +27,14 @@ export default function PowerHour({ token }: PowerHourProps) {
   } = useSpotifyPlayer(token);
   const hour = useHourEngine(token, deviceId, round?.tracks ?? [], player);
 
-  // Chrome only lets audio begin inside a click, so the first track cannot
-  // start automatically. It is queued as soon as a playlist is chosen, and
-  // the play button on the next screen does the starting.
-  const preloaded = useRef(false);
+  // The engine only sees the round on the render after it is set, so
+  // starting is deferred until then.
+  const started = useRef(false);
 
   useEffect(() => {
-    if (!preloaded.current && round?.tracks.length && playerStatus === 'ready') {
-      preloaded.current = true;
-      void hour.preload();
+    if (!started.current && round?.tracks.length && playerStatus === 'ready') {
+      started.current = true;
+      hour.start();
     }
   }, [round, playerStatus, hour]);
 
@@ -75,13 +74,13 @@ export default function PowerHour({ token }: PowerHourProps) {
     );
   }
 
-  if (round) {
+  if (round && hour.status !== 'idle') {
     return (
       <HourPlayer
         hour={hour}
         onExit={() => {
           hour.stop();
-          preloaded.current = false;
+          started.current = false;
           setRound(null);
         }}
       />

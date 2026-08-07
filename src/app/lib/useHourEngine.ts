@@ -25,8 +25,6 @@ export type Hour = {
   remainingMs: number;
   total: number;
   error: string | null;
-  /** Queues the first track so start only has to press play. */
-  preload: () => Promise<void>;
   start: () => void;
   pause: () => void;
   resume: () => void;
@@ -64,14 +62,12 @@ async function playTrack(
 }
 
 /**
- * The REST endpoint reliably loads a track and unreliably starts it. It
- * reports `paused: false` for a moment, emits a playback error, and settles
- * back to paused at position zero. Calling resume afterwards starts the
- * track that is already loaded, which does work.
+ * Waits until sound is genuinely coming out, then reports whether it is.
  *
- * The test that matters is whether the position moves. `paused === false`
- * appears during the failed attempt too, so trusting it returns success
- * while the track sits silent.
+ * The test is whether the position moves. `paused === false` is not enough:
+ * a track that fails to stream still reports itself unpaused for a moment
+ * before erroring back to zero, so trusting that flag means starting the
+ * minute against silence.
  */
 async function ensurePlaying(player: Spotify.Player | null): Promise<boolean> {
   if (!player) return false;
@@ -205,47 +201,10 @@ export function useHourEngine(
 
   useEffect(() => clearTick, [clearTick]);
 
-  /**
-   * Loads the first track without starting it. Spotify's play endpoint
-   * reliably queues a track and reliably fails to start one, so the queue
-   * is all we want from it here.
-   */
-  const preload = useCallback(async () => {
-    if (!token || !deviceId || !tracks.length) return;
-    await playTrack(token, deviceId, tracks[0]).catch(() => {});
-  }, [token, deviceId, tracks]);
-
-  /**
-   * MUST be called synchronously from a click. Chrome only lets an audio
-   * element begin playing inside a user gesture, and every attempt to start
-   * from a network callback failed with a bare playback error. Once sound
-   * has started once this way the element stays unlocked, so later tracks
-   * can start on their own.
-   */
   const start = useCallback(() => {
     setError(null);
-    const player = playerRef.current;
-    if (!player) return;
-
-    // No await before this: anything asynchronous forfeits the gesture.
-    void player.activateElement?.();
-    void player.resume();
-
-    void (async () => {
-      const playing = await ensurePlaying(player);
-      if (!playing) {
-        setError('Spotify would not start the music. Try pressing start again.');
-        return;
-      }
-      indexRef.current = 0;
-      setIndex(0);
-      const offset = startOffsetMs(tracks[0]);
-      if (offset > 0) await player.seek(offset).catch(() => {});
-      deadlineRef.current = Date.now() + MINUTE_MS;
-      setRemainingMs(MINUTE_MS);
-      setStatus('playing');
-    })();
-  }, [tracks]);
+    void playAt(0);
+  }, [playAt]);
 
   const pause = useCallback(() => {
     if (!token || !deviceId) return;
@@ -294,7 +253,6 @@ export function useHourEngine(
     remainingMs,
     total: tracks.length,
     error,
-    preload,
     start,
     pause,
     resume,
