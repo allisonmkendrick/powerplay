@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Container, Title, Text, Button, Stack, Center, Loader } from '@mantine/core';
 import PlaylistList from './components/PlaylistList';
@@ -27,7 +27,7 @@ function handleLogin() {
   window.location.href = authUrl;
 }
 
-export default function HomePage() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const code = searchParams.get('code');
@@ -106,5 +106,21 @@ export default function HomePage() {
         </Stack>
       </Container>
     </Center>
+  );
+}
+
+// useSearchParams opts the tree out of prerendering, so Next requires a
+// Suspense boundary above it. Without one the production build fails.
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <Center style={{ minHeight: '100vh' }}>
+          <Loader size="xl" />
+        </Center>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }

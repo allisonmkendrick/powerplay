@@ -12,7 +12,7 @@
     "@mantine/core": "^8.2.1",
     "@mantine/hooks": "^8.2.1",
     "@mantine/notifications": "^8.2.1",
-    "next": "15.4.3",
+    "next": "^15.5.23",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
@@ -22,8 +22,9 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/spotify-web-playback-sdk": "^0.1.19",
     "eslint": "^9",
-    "eslint-config-next": "15.4.3",
+    "eslint-config-next": "^15.5.23",
     "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "typescript": "^5"
