@@ -31,17 +31,17 @@ export default function PowerHour({ token }: PowerHourProps) {
   const hour = useHourEngine(token, deviceId, round?.tracks ?? [], player);
   const devices = useDevices(token);
 
-  // The engine only sees the round on the render after it is set, so
-  // starting is deferred until then. Calling start in the click handler
-  // would hand it the previous, empty track list.
-  const startPending = useRef(false);
+  // Chrome only lets audio begin inside a click, so the first track cannot
+  // start automatically. It is queued as soon as a playlist is chosen, and
+  // the play button on the next screen does the starting.
+  const preloaded = useRef(false);
 
   useEffect(() => {
-    if (startPending.current && round?.tracks.length && hour.status === 'idle') {
-      startPending.current = false;
-      hour.start();
+    if (!preloaded.current && round?.tracks.length && playerStatus === 'ready') {
+      preloaded.current = true;
+      void hour.preload();
     }
-  }, [round, hour]);
+  }, [round, playerStatus, hour]);
 
   if (playerStatus === 'needs-premium') {
     return (
@@ -79,7 +79,7 @@ export default function PowerHour({ token }: PowerHourProps) {
     );
   }
 
-  if (round && hour.status !== 'idle') {
+  if (round) {
     return (
       <HourPlayer
         hour={hour}
@@ -88,6 +88,7 @@ export default function PowerHour({ token }: PowerHourProps) {
         deviceId={deviceId}
         onExit={() => {
           hour.stop();
+          preloaded.current = false;
           setRound(null);
         }}
       />
@@ -99,11 +100,7 @@ export default function PowerHour({ token }: PowerHourProps) {
       token={token}
       canStart={playerStatus === 'ready'}
       onStart={(built) => {
-        // Unlock audio here, inside the click. Doing it after the state
-        // update would no longer count as a user gesture and the browser
-        // would refuse to make any sound.
         void activate();
-        startPending.current = true;
         setRound(built);
       }}
     />

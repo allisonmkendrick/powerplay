@@ -47,6 +47,34 @@ export default function HourPlayer({
     );
   }
 
+  // The first track has to be started by a real click, so the hour opens
+  // on a play button rather than starting itself.
+  if (status === 'idle') {
+    return (
+      <Container size="sm" py="xl">
+        <Stack align="center" gap="lg">
+          <Title order={2} ta="center">
+            Ready when you are.
+          </Title>
+          <Text ta="center" c="dimmed">
+            {total} {total === 1 ? 'track' : 'tracks'}, one minute each.
+          </Text>
+          <Button size="xl" radius="xl" onClick={hour.start}>
+            Play
+          </Button>
+          {error && (
+            <Text ta="center" c="red" size="sm">
+              {error}
+            </Text>
+          )}
+          <Button variant="subtle" color="gray" onClick={onExit}>
+            Pick another playlist
+          </Button>
+        </Stack>
+      </Container>
+    );
+  }
+
   const elapsed = MINUTE_MS - remainingMs;
 
   return (

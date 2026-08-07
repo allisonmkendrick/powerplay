@@ -25,6 +25,8 @@ export type Hour = {
   remainingMs: number;
   total: number;
   error: string | null;
+  /** Queues the first track so start only has to press play. */
+  preload: () => Promise<void>;
   start: () => void;
   pause: () => void;
   resume: () => void;
@@ -203,12 +205,47 @@ export function useHourEngine(
 
   useEffect(() => clearTick, [clearTick]);
 
+  /**
+   * Loads the first track without starting it. Spotify's play endpoint
+   * reliably queues a track and reliably fails to start one, so the queue
+   * is all we want from it here.
+   */
+  const preload = useCallback(async () => {
+    if (!token || !deviceId || !tracks.length) return;
+    await playTrack(token, deviceId, tracks[0]).catch(() => {});
+  }, [token, deviceId, tracks]);
+
+  /**
+   * MUST be called synchronously from a click. Chrome only lets an audio
+   * element begin playing inside a user gesture, and every attempt to start
+   * from a network callback failed with a bare playback error. Once sound
+   * has started once this way the element stays unlocked, so later tracks
+   * can start on their own.
+   */
   const start = useCallback(() => {
     setError(null);
-    // The play call names the device, so no separate transfer is needed.
-    // Sending one with play:false raced the first track and paused it.
-    void playAt(0);
-  }, [playAt]);
+    const player = playerRef.current;
+    if (!player) return;
+
+    // No await before this: anything asynchronous forfeits the gesture.
+    void player.activateElement?.();
+    void player.resume();
+
+    void (async () => {
+      const playing = await ensurePlaying(player);
+      if (!playing) {
+        setError('Spotify would not start the music. Try pressing start again.');
+        return;
+      }
+      indexRef.current = 0;
+      setIndex(0);
+      const offset = startOffsetMs(tracks[0]);
+      if (offset > 0) await player.seek(offset).catch(() => {});
+      deadlineRef.current = Date.now() + MINUTE_MS;
+      setRemainingMs(MINUTE_MS);
+      setStatus('playing');
+    })();
+  }, [tracks]);
 
   const pause = useCallback(() => {
     if (!token || !deviceId) return;
@@ -257,6 +294,7 @@ export function useHourEngine(
     remainingMs,
     total: tracks.length,
     error,
+    preload,
     start,
     pause,
     resume,
