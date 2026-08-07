@@ -8,6 +8,9 @@ type RoundPreviewProps = {
   loading: boolean;
   error: string | null;
   onRebuild: () => void;
+  onStart: () => void;
+  /** False while the Spotify player is still connecting. */
+  canStart: boolean;
 };
 
 function minutes(ms: number): string {
@@ -22,6 +25,8 @@ export default function RoundPreview({
   loading,
   error,
   onRebuild,
+  onStart,
+  canStart,
 }: RoundPreviewProps) {
   if (loading) {
     return (
@@ -66,9 +71,14 @@ export default function RoundPreview({
         <Text fw={600}>
           {round.tracks.length} {round.tracks.length === 1 ? 'track' : 'tracks'} ready
         </Text>
-        <Button size="xs" variant="subtle" onClick={onRebuild}>
-          Reshuffle
-        </Button>
+        <Group gap="xs">
+          <Button size="xs" variant="subtle" onClick={onRebuild}>
+            Reshuffle
+          </Button>
+          <Button size="xs" onClick={onStart} disabled={!canStart}>
+            {canStart ? 'Start the hour' : 'Connecting...'}
+          </Button>
+        </Group>
       </Group>
 
       {round.shortfall > 0 && (

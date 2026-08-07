@@ -9,6 +9,8 @@ import { buildRound, type Round } from '../lib/round';
 
 type PlaylistListProps = {
   token: string;
+  canStart: boolean;
+  onStart: (round: Round) => void;
 };
 
 export type Playlist = {
@@ -21,7 +23,7 @@ export type Playlist = {
   owner: { display_name: string };
 };
 
-export default function PlaylistList({ token }: PlaylistListProps) {
+export default function PlaylistList({ token, canStart, onStart }: PlaylistListProps) {
   const [playlists, setPlaylists] = useState<Playlist[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +122,8 @@ export default function PlaylistList({ token }: PlaylistListProps) {
                 loading={buildingRound}
                 error={roundError}
                 onRebuild={() => selectPlaylist(pl)}
+                onStart={() => round && onStart(round)}
+                canStart={canStart}
               />
             )}
           </div>
