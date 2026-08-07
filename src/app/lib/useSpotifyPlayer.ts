@@ -25,6 +25,10 @@ export type SdkState = {
   /** False when the browser build has no way to unlock audio. */
   canActivate: boolean;
   activated: boolean;
+  /** Whatever the SDK last complained about, verbatim. */
+  lastError: string | null;
+  /** How many times playback has stopped and reset. */
+  stalls: number;
 };
 
 type PlayerHandle = {
@@ -87,6 +91,8 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
     volume: null,
     canActivate: false,
     activated: false,
+    lastError: null,
+    stalls: 0,
   });
 
   // The SDK asks for a token whenever it needs one, which can be long after
@@ -139,6 +145,10 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
         if (cancelled || !state) return;
         setSdk((s) => ({
           ...s,
+          // Falling back to a paused zero after having played is a stall,
+          // which is the signature of a stream that cannot be decrypted.
+          stalls:
+            !s.paused && state.paused && state.position === 0 ? s.stalls + 1 : s.stalls,
           paused: state.paused,
           positionMs: state.position,
           trackName: state.track_window?.current_track?.name ?? null,
@@ -172,6 +182,14 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
       player.addListener('playback_error', ({ message }) => {
         if (cancelled) return;
         setError(message || 'Spotify could not play that track.');
+        setSdk((s) => ({ ...s, lastError: message || 'playback_error' }));
+      });
+
+      // These two are usually where a DRM or account problem announces
+      // itself, and both were being discarded.
+      player.addListener('autoplay_failed', () => {
+        if (cancelled) return;
+        setSdk((s) => ({ ...s, lastError: 'autoplay_failed' }));
       });
 
       await player.connect();

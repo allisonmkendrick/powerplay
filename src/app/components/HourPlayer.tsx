@@ -113,6 +113,9 @@ export default function HourPlayer({ hour, onExit, sdk }: HourPlayerProps) {
           <Text size="xs" c="dimmed" ta="center" ff="monospace">
             canActivate={String(sdk.canActivate)} activated={String(sdk.activated)}
           </Text>
+          <Text size="xs" c={sdk.lastError ? 'red' : 'dimmed'} ta="center" ff="monospace">
+            stalls={sdk.stalls} lastError={sdk.lastError ?? 'none'}
+          </Text>
         </Stack>
       </Stack>
     </Container>
