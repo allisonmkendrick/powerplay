@@ -193,6 +193,21 @@ export function useSpotifyPlayer(token: string | null): PlayerHandle {
       });
 
       await player.connect();
+
+      // The SDK can hang indefinitely when it cannot reach its own storage,
+      // which happens with third-party cookies blocked or in private
+      // windows. Waiting forever behind a spinner tells nobody anything.
+      setTimeout(() => {
+        if (cancelled) return;
+        setStatus((current) => {
+          if (current !== 'loading') return current;
+          setError(
+            'Spotify never finished connecting. This usually means third-party ' +
+              'cookies are blocked, or the browser is in a private window.',
+          );
+          return 'error';
+        });
+      }, 15_000);
     })();
 
     return () => {
