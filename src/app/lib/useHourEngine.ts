@@ -78,6 +78,28 @@ async function transferPlayback(token: string, deviceId: string): Promise<void> 
   });
 }
 
+/**
+ * The REST call loads the track but does not always start it. Transferring
+ * a device and then playing races often enough that the track lands queued
+ * at position zero and simply waits. Ask the SDK what actually happened and
+ * nudge it if it is sitting still.
+ */
+async function ensurePlaying(player: Spotify.Player | null): Promise<void> {
+  if (!player) return;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await new Promise((r) => setTimeout(r, 150));
+    const state = await player.getCurrentState();
+
+    // No state means this device is not the active one, which resume
+    // cannot fix, so leave it for the caller to report.
+    if (!state) continue;
+    if (!state.paused) return;
+
+    await player.resume().catch(() => {});
+  }
+}
+
 async function pausePlayback(token: string, deviceId: string): Promise<void> {
   await fetch(`https://api.spotify.com/v1/me/player/pause?device_id=${deviceId}`, {
     method: 'PUT',
@@ -91,6 +113,7 @@ export function useHourEngine(
   token: string | null,
   deviceId: string | null,
   tracks: Track[],
+  player: Spotify.Player | null,
 ): Hour {
   const [status, setStatus] = useState<HourStatus>('idle');
   const [index, setIndex] = useState(0);
@@ -102,6 +125,11 @@ export function useHourEngine(
   const deadlineRef = useRef<number | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const indexRef = useRef(0);
+
+  // The player instance arrives after the first render, so read it through
+  // a ref rather than baking a null into the playback callbacks.
+  const playerRef = useRef(player);
+  playerRef.current = player;
 
   const clearTick = useCallback(() => {
     if (tickRef.current) {
@@ -128,6 +156,8 @@ export function useHourEngine(
 
       try {
         await playTrack(token, deviceId, tracks[position]);
+        // The minute starts when sound does, not when the request returns.
+        await ensurePlaying(playerRef.current);
         deadlineRef.current = Date.now() + MINUTE_MS;
         setStatus('playing');
       } catch (err) {
@@ -188,10 +218,12 @@ export function useHourEngine(
     // picking up wherever Spotify happened to stop.
     deadlineRef.current = Date.now() + remainingMs;
     setStatus('playing');
-    void playTrack(token, deviceId, tracks[indexRef.current]).catch(() => {
-      setError('Could not resume. Try again.');
-      setStatus('paused');
-    });
+    void playTrack(token, deviceId, tracks[indexRef.current])
+      .then(() => ensurePlaying(playerRef.current))
+      .catch(() => {
+        setError('Could not resume. Try again.');
+        setStatus('paused');
+      });
   }, [token, deviceId, tracks, remainingMs]);
 
   const skip = useCallback(() => {

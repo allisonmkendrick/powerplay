@@ -25,8 +25,9 @@ export default function PowerHour({ token }: PowerHourProps) {
     error: playerError,
     activate,
     sdk,
+    player,
   } = useSpotifyPlayer(token);
-  const hour = useHourEngine(token, deviceId, round?.tracks ?? []);
+  const hour = useHourEngine(token, deviceId, round?.tracks ?? [], player);
 
   // The engine only sees the round on the render after it is set, so
   // starting is deferred until then. Calling start in the click handler
