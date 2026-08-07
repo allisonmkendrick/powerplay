@@ -43,6 +43,32 @@ const TICK_MS = 200;
 const TRACK_CHANGE_TIMEOUT_MS = 4_000;
 
 /**
+ * Long enough to sound deliberate, short enough that nobody notices the
+ * hour running over. Sixty of these adds about forty seconds in total.
+ */
+const FADE_MS = 320;
+const FADE_STEPS = 16;
+
+/**
+ * Ramps the volume rather than letting the stream stop dead. Cutting a
+ * track mid-waveform is what makes the click between songs, and seeking
+ * into the next one clicks again, so both happen while the volume is down.
+ */
+async function fade(
+  player: Spotify.Player | null,
+  from: number,
+  to: number,
+): Promise<void> {
+  if (!player) return;
+
+  for (let step = 1; step <= FADE_STEPS; step++) {
+    const level = from + (to - from) * (step / FADE_STEPS);
+    await player.setVolume(Math.min(1, Math.max(0, level))).catch(() => {});
+    await new Promise((r) => setTimeout(r, FADE_MS / FADE_STEPS));
+  }
+}
+
+/**
  * Hands Spotify the entire round in one call, so its queue is exactly our
  * round and there is no gap for it to fill.
  */
@@ -143,6 +169,10 @@ export function useHourEngine(
   const playerRef = useRef(player);
   playerRef.current = player;
 
+  // The level to fade back up to, captured before the first fade takes the
+  // volume to zero and loses it.
+  const fullVolumeRef = useRef(0.8);
+
   const clearTick = useCallback(() => {
     if (tickRef.current) {
       clearInterval(tickRef.current);
@@ -190,6 +220,9 @@ export function useHourEngine(
       const track = tracks[position];
       const player = playerRef.current;
 
+      // Down before the cut, up after the seek, so neither clicks.
+      await fade(player, fullVolumeRef.current, 0);
+
       await player?.nextTrack().catch(() => {});
       let landed = await waitForTrack(player, track.uri);
 
@@ -201,12 +234,15 @@ export function useHourEngine(
       }
 
       if (!landed) {
+        // Do not leave the hour silent on the way out.
+        await fade(player, 0, fullVolumeRef.current);
         setError('Lost track of the queue. Try starting the hour again.');
         setStatus('paused');
         return;
       }
 
       await applyOffset(track);
+      await fade(player, 0, fullVolumeRef.current);
       beginMinute(position);
     },
     [token, deviceId, tracks, finish, applyOffset, beginMinute],
@@ -246,15 +282,24 @@ export function useHourEngine(
 
     void (async () => {
       try {
+        // Remember the level now, before muting loses it.
+        const level = await playerRef.current?.getVolume().catch(() => 0.8);
+        if (typeof level === 'number' && level > 0) fullVolumeRef.current = level;
+
+        // Silent until the offset is applied, so the intro we are skipping
+        // is never heard on the way past.
+        await playerRef.current?.setVolume(0).catch(() => {});
         await queueRound(token, deviceId, tracks);
 
         if (!(await ensurePlaying(playerRef.current))) {
+          await fade(playerRef.current, 0, fullVolumeRef.current);
           setError('Spotify would not start the music.');
           setStatus('paused');
           return;
         }
 
         await applyOffset(tracks[0]);
+        await fade(playerRef.current, 0, fullVolumeRef.current);
         beginMinute(0);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Playback failed.');
