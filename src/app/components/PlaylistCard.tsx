@@ -1,6 +1,6 @@
 'use client';
 
-import type { Playlist } from './PlaylistList';
+import type { Playlist } from '../lib/spotify';
 
 type PlaylistCardProps = {
   playlist: Playlist;
