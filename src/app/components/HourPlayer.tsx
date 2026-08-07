@@ -1,13 +1,10 @@
 'use client';
 
-import { Button, Container, Group, Progress, Stack, Text, Title } from '@mantine/core';
+import { Pause, Play, SkipForward, Square } from 'lucide-react';
+import Window from './Window';
+import { Sparkle } from './Sparkles';
 import type { Hour } from '../lib/useHourEngine';
 import { MINUTE_MS } from '../lib/startOffset';
-
-/**
- * Deliberately plain. The player screen is where the design work goes (#7),
- * and building it twice would be a waste, so this is structure only.
- */
 
 type HourPlayerProps = {
   hour: Hour;
@@ -23,78 +20,77 @@ export default function HourPlayer({ hour, onExit }: HourPlayerProps) {
 
   if (status === 'finished') {
     return (
-      <Container size="sm" py="xl">
-        <Stack align="center" gap="md">
-          <Title ta="center">That is the hour.</Title>
-          <Text ta="center" c="dimmed">
-            {total} {total === 1 ? 'track' : 'tracks'}, one minute each.
-          </Text>
-          <Button onClick={onExit}>Pick another playlist</Button>
-        </Stack>
-      </Container>
+      <div className="center-screen">
+        <Window title="powerplay.exe" dialog>
+          <div className="stack center">
+            <h1 className="pixel">THAT IS THE HOUR</h1>
+            <p className="terminal">
+              {total} {total === 1 ? 'track' : 'tracks'}, one minute each.
+            </p>
+            <div className="btn-row" style={{ justifyContent: 'center' }}>
+              <button className="btn btn--primary" onClick={onExit}>
+                GO AGAIN
+              </button>
+            </div>
+          </div>
+        </Window>
+      </div>
     );
   }
 
   const elapsed = MINUTE_MS - remainingMs;
+  const pct = Math.min(100, (elapsed / MINUTE_MS) * 100);
 
   return (
-    <Container size="sm" py="xl">
-      <Stack gap="lg">
-        <Text ta="center" c="dimmed" size="sm">
-          {index + 1} of {total}
-        </Text>
+    <div className="desktop relative">
+      <Sparkle size={26} style={{ top: 8, right: 12 }} />
+      <Sparkle size={16} style={{ top: 130, left: 2 }} />
+      <Sparkle size={20} style={{ bottom: 40, right: 40 }} />
 
-        <Stack gap={4} align="center">
-          <Title order={1} ta="center">
-            {current?.name ?? ''}
-          </Title>
-          <Text ta="center" c="dimmed" size="lg">
-            {current?.artists ?? ''}
-          </Text>
-        </Stack>
+      <Window title={`now_playing.exe  ·  ${index + 1} of ${total}`}>
+        <div className="stack">
+          <p className="countdown">{seconds(remainingMs)}</p>
 
-        <Stack gap={4} align="center">
-          <Text
-            ta="center"
-            fw={700}
-            style={{ fontSize: 64, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}
-          >
-            {seconds(remainingMs)}
-          </Text>
-          <Progress
-            value={(elapsed / MINUTE_MS) * 100}
-            w="100%"
-            size="sm"
-            transitionDuration={0}
-          />
-        </Stack>
+          <div className="progress">
+            <div className="progress__fill" style={{ width: `${pct}%` }} />
+          </div>
 
-        {next && (
-          <Text ta="center" size="sm" c="dimmed">
-            Next: {next.name}, {next.artists}
-          </Text>
-        )}
+          <div className="stack--tight center" style={{ marginTop: 4 }}>
+            <p className="now-playing">{current?.name ?? ''}</p>
+            <p className="terminal muted">{current?.artists ?? ''}</p>
+          </div>
 
-        {error && (
-          <Text ta="center" c="red" size="sm">
-            {error}
-          </Text>
-        )}
+          {error && <p className="center danger">{error}</p>}
 
-        <Group justify="center" gap="sm">
-          {status === 'playing' ? (
-            <Button onClick={hour.pause}>Pause</Button>
-          ) : (
-            <Button onClick={hour.resume}>Resume</Button>
-          )}
-          <Button variant="light" onClick={hour.skip}>
-            Skip
-          </Button>
-          <Button variant="subtle" color="gray" onClick={onExit}>
-            End
-          </Button>
-        </Group>
-      </Stack>
-    </Container>
+          <div className="btn-row" style={{ justifyContent: 'center' }}>
+            {status === 'playing' ? (
+              <button className="btn btn--primary" onClick={hour.pause}>
+                <Pause size={14} strokeWidth={2} style={{ verticalAlign: -2 }} /> PAUSE
+              </button>
+            ) : (
+              <button className="btn btn--primary" onClick={hour.resume}>
+                <Play size={14} strokeWidth={2} style={{ verticalAlign: -2 }} /> PLAY
+              </button>
+            )}
+            <button className="btn" onClick={hour.skip}>
+              <SkipForward size={14} strokeWidth={2} style={{ verticalAlign: -2 }} /> SKIP
+            </button>
+            <button className="btn btn--danger" onClick={onExit}>
+              <Square size={14} strokeWidth={2} style={{ verticalAlign: -2 }} /> END
+            </button>
+          </div>
+        </div>
+      </Window>
+
+      {next && (
+        <Window title="up_next.txt">
+          <p className="truncate">
+            <span className="label">Next</span>
+            <br />
+            {next.name} <span className="muted">{next.artists}</span>
+          </p>
+        </Window>
+      )}
+    </div>
   );
 }

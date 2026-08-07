@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Container, Title, Text, Stack, Center, Loader } from '@mantine/core';
+import Window from './Window';
+import { Sparkle } from './Sparkles';
 import PlaylistCard from './PlaylistCard';
 import RoundPreview from './RoundPreview';
 import { fetchPlaylistTracks, SpotifyError } from '../lib/spotify';
@@ -82,53 +83,67 @@ export default function PlaylistList({ token, canStart, onStart }: PlaylistListP
 
   if (loading) {
     return (
-      <Center style={{ minHeight: '100vh' }}>
-        <Loader size="xl" />
-        <Text ta="center">Loading playlists...</Text>
-      </Center>
+      <div className="center-screen">
+        <Window title="loading.exe" dialog>
+          <p className="terminal center">Fetching your playlists...</p>
+        </Window>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Text color="red" ta="center">
-        {error}
-      </Text>
+      <div className="center-screen">
+        <Window title="error.exe" dialog>
+          <p className="terminal danger center">{error}</p>
+        </Window>
+      </div>
     );
   }
 
   if (!playlists?.length) {
-    return <Text ta="center">No playlists found!</Text>;
+    return (
+      <div className="center-screen">
+        <Window title="empty.exe" dialog>
+          <p className="terminal center">No playlists found.</p>
+        </Window>
+      </div>
+    );
   }
 
   return (
-    <Container>
-      <Title ta="center" mb="md">
-        Select a playlist to start your Power Hour.
-      </Title>
+    <div className="desktop relative">
+      <Sparkle size={24} style={{ top: 6, right: 10 }} />
+      <Sparkle size={14} style={{ top: 90, left: 0 }} />
 
-      <Stack gap="sm" style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 32 }}>
-        {playlists.map((pl) => (
-          <div key={pl.id}>
+      <Window title="pick_a_playlist.exe">
+        <div className="rows">
+          {playlists.map((pl) => (
             <PlaylistCard
+              key={pl.id}
               playlist={pl}
               onClick={() => selectPlaylist(pl)}
               selected={selectedPlaylistId === pl.id}
             />
+          ))}
+        </div>
+      </Window>
 
-            {selectedPlaylistId === pl.id && (
-              <RoundPreview
-                round={round}
-                loading={buildingRound}
-                error={roundError}
-                onRebuild={() => selectPlaylist(pl)}
-                onStart={() => round && onStart(round)}
-                canStart={canStart}
-              />
-            )}
-          </div>
-        ))}
-      </Stack>
-    </Container>
+      {selectedPlaylistId && (
+        <Window title="your_hour.exe">
+          <RoundPreview
+            round={round}
+            loading={buildingRound}
+            error={roundError}
+            onRebuild={() => {
+              const pl = playlists.find((p) => p.id === selectedPlaylistId);
+              if (pl) selectPlaylist(pl);
+            }}
+            onStart={() => round && onStart(round)}
+            canStart={canStart}
+          />
+        </Window>
+      )}
+    </div>
   );
 }

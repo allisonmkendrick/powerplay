@@ -1,6 +1,5 @@
 'use client';
 
-import { Alert, Button, Card, Group, Loader, ScrollArea, Text } from '@mantine/core';
 import { ROUND_LENGTH, type Round } from '../lib/round';
 
 type RoundPreviewProps = {
@@ -13,13 +12,6 @@ type RoundPreviewProps = {
   canStart: boolean;
 };
 
-function minutes(ms: number): string {
-  const total = Math.round(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
 export default function RoundPreview({
   round,
   loading,
@@ -29,26 +21,19 @@ export default function RoundPreview({
   canStart,
 }: RoundPreviewProps) {
   if (loading) {
-    return (
-      <Card withBorder radius="lg" p="md" mb="sm" style={{ maxWidth: 480, margin: '0 auto' }}>
-        <Group gap="sm">
-          <Loader size="sm" />
-          <Text size="sm">Building your hour...</Text>
-        </Group>
-      </Card>
-    );
+    return <p className="terminal">Building your hour...</p>;
   }
 
   if (error) {
     return (
-      <Alert color="red" radius="lg" mb="sm" style={{ maxWidth: 480, margin: '0 auto' }}>
-        <Text size="sm" mb="xs">
-          {error}
-        </Text>
-        <Button size="xs" variant="light" onClick={onRebuild}>
-          Try again
-        </Button>
-      </Alert>
+      <div className="stack">
+        <p className="terminal danger">{error}</p>
+        <div className="btn-row">
+          <button className="btn" onClick={onRebuild}>
+            TRY AGAIN
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -56,58 +41,46 @@ export default function RoundPreview({
 
   if (round.tracks.length === 0) {
     return (
-      <Alert color="yellow" radius="lg" mb="sm" style={{ maxWidth: 480, margin: '0 auto' }}>
-        <Text size="sm">
-          Nothing in this playlist can be played. Local files and podcasts do not work
-          in a power hour.
-        </Text>
-      </Alert>
+      <p className="terminal">
+        Nothing here can be played. Local files and podcasts do not work in a
+        power hour.
+      </p>
     );
   }
 
   return (
-    <Card withBorder radius="lg" p="md" mb="sm" style={{ maxWidth: 480, margin: '0 auto' }}>
-      <Group justify="space-between" mb="xs">
-        <Text fw={600}>
-          {round.tracks.length} {round.tracks.length === 1 ? 'track' : 'tracks'} ready
-        </Text>
-        <Group gap="xs">
-          <Button size="xs" variant="subtle" onClick={onRebuild}>
-            Reshuffle
-          </Button>
-          <Button size="xs" onClick={onStart} disabled={!canStart}>
-            {canStart ? 'Start the hour' : 'Connecting...'}
-          </Button>
-        </Group>
-      </Group>
+    <div className="stack">
+      <p className="pixel" style={{ fontSize: 12 }}>
+        {round.tracks.length} READY
+      </p>
 
       {round.shortfall > 0 && (
-        <Text size="sm" c="dimmed" mb="sm">
-          This playlist has {round.shortfall} fewer playable tracks than a full hour
-          needs, so yours will run {round.tracks.length} minutes. Pick a longer
-          playlist for the full {ROUND_LENGTH}.
-        </Text>
+        <p className="terminal muted">
+          {round.shortfall} short of a full hour, so yours runs{' '}
+          {round.tracks.length} minutes. Pick a longer playlist for all{' '}
+          {ROUND_LENGTH}.
+        </p>
       )}
 
-      <ScrollArea.Autosize mah={260} type="auto">
+      <div className="tracklist">
         {round.tracks.map((track, i) => (
-          <Group key={track.uri} justify="space-between" wrap="nowrap" py={4}>
-            <Text size="sm" c="dimmed" w={28} style={{ flexShrink: 0 }}>
-              {i + 1}
-            </Text>
-            <Text size="sm" truncate style={{ flex: 1 }}>
-              {track.name}
-              <Text component="span" size="sm" c="dimmed">
-                {' '}
-                {track.artists}
-              </Text>
-            </Text>
-            <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-              {minutes(track.durationMs)}
-            </Text>
-          </Group>
+          <div key={track.uri}>
+            <span>{i + 1}</span>
+            <span className="truncate">
+              {track.name} <span className="muted">{track.artists}</span>
+            </span>
+          </div>
         ))}
-      </ScrollArea.Autosize>
-    </Card>
+      </div>
+
+      <div className="btn-row">
+        <button className="btn btn--primary btn--big" onClick={onStart} disabled={!canStart}>
+          {canStart ? 'START THE HOUR' : 'CONNECTING...'}
+        </button>
+        <button className="btn" onClick={onRebuild}>
+          RESHUFFLE
+        </button>
+      </div>
+    </div>
   );
 }
